@@ -23,26 +23,25 @@
  */
 package net.sourceforge.plantuml.servlet;
 
-import java.io.IOException;
-import java.net.URL;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import HTTPClient.CookieModule;
+import net.sourceforge.plantuml.FileFormat;
+import net.sourceforge.plantuml.FileFormatOption;
+import net.sourceforge.plantuml.SourceStringReader;
 
+import javax.net.ssl.HttpsURLConnection;
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import HTTPClient.CookieModule;
-import HTTPClient.HTTPConnection;
-import HTTPClient.HTTPResponse;
-import HTTPClient.ModuleException;
-import HTTPClient.ParseException;
-
-import net.sourceforge.plantuml.FileFormat;
-import net.sourceforge.plantuml.FileFormatOption;
-import net.sourceforge.plantuml.SourceStringReader;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /* 
  * Proxy servlet of the webapp.
@@ -52,7 +51,7 @@ import net.sourceforge.plantuml.SourceStringReader;
 @SuppressWarnings("serial")
 public class ProxyServlet extends HttpServlet {
 
-    private static final Pattern proxyPattern = Pattern.compile("/\\w+/proxy/((\\d+)/)?((\\w+)/)?(http://.*)");
+    private static final Pattern proxyPattern = Pattern.compile("/\\w+/proxy/((\\d+)/)?((\\w+)/)?(https://.*)");
     private String format;
 
     @Override
@@ -86,21 +85,43 @@ public class ProxyServlet extends HttpServlet {
     private String getSource(String uri) throws IOException {
         CookieModule.setCookiePolicyHandler(null);
 
-        final Pattern p = Pattern.compile("http://[^/]+(/?.*)");
+        final Pattern p = Pattern.compile("https://[^/]+(/?.*)");
         final Matcher m = p.matcher(uri);
         if (m.find() == false) {
             throw new IOException(uri);
         }
         final URL url = new URL(uri);
-        final HTTPConnection httpConnection = new HTTPConnection(url);
+
+        String line;
+        OutputStreamWriter wr = null;
+        BufferedReader rd  = null;
+        StringBuilder sb = null;
         try {
-            final HTTPResponse resp = httpConnection.Get(m.group(1));
-            return resp.getText();
-        } catch (ModuleException e) {
-            throw new IOException(e.toString());
-        } catch (ParseException e) {
-            throw new IOException(e.toString());
+
+            HttpsURLConnection con = (HttpsURLConnection)url.openConnection();
+            con.setRequestMethod("GET");
+            con.setDoOutput(true);
+            con.setReadTimeout(10000);
+
+            con.connect();
+            rd  = new BufferedReader(new InputStreamReader(con.getInputStream()));
+            sb = new StringBuilder();
+
+            while ((line = rd.readLine()) != null)
+            {
+                sb.append(line + '\n');
+            }
+
+            return sb.toString();
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally{
+            rd = null;
+            wr = null;
         }
+        return "";
     }
 
     private FileFormat getOutputFormat() {

@@ -1,13 +1,21 @@
 package net.sourceforge.plantuml.servlet;
 
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-
+import com.meterware.httpunit.Base64;
 import com.meterware.httpunit.GetMethodWebRequest;
 import com.meterware.httpunit.WebConversation;
 import com.meterware.httpunit.WebForm;
 import com.meterware.httpunit.WebRequest;
 import com.meterware.httpunit.WebResponse;
+
+import javax.net.ssl.HttpsURLConnection;
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.MalformedURLException;
+import java.net.URL;
 
 public class TestProxy extends WebappTestCase {
     /**
@@ -15,7 +23,8 @@ public class TestProxy extends WebappTestCase {
      */
     public void testDefaultProxy() throws Exception {
         WebConversation conversation = new WebConversation();
-        WebRequest request = new GetMethodWebRequest(getServerUrl() + "proxy/" + getServerUrl() + "welcome");
+        WebRequest request = new GetMethodWebRequest(getServerUrl()+"proxy/png/https://github.scm.corp.ebay.com/MobilePlatform/AccessControlService/raw/master/docs/add_user_role.puml");
+//        WebRequest request = new GetMethodWebRequest(getServerUrl()+"proxy/"+getServerUrl()+"/welcome");
         WebResponse response = conversation.getResource(request);
         // Analyze response
         // Verifies the Content-Type header
@@ -32,8 +41,8 @@ public class TestProxy extends WebappTestCase {
         responseStream.close();
         byte[] inMemoryImage = imageStream.toByteArray();
         int diagramLen = inMemoryImage.length;
-        assertTrue(diagramLen > 1500);
-        assertTrue(diagramLen < 2500);
+        assertTrue(diagramLen > 100);
+        assertTrue(diagramLen < 25000);
     }
 
     public void testProxyWithFormat() throws Exception {
@@ -63,5 +72,42 @@ public class TestProxy extends WebappTestCase {
         assertEquals("Response content type is not HTML", "text/html", response.getContentType());
         WebForm forms[] = response.getForms();
         assertEquals(2, forms.length);
+    }
+
+    public void testUrl() throws Exception {
+        String line;
+        OutputStreamWriter wr = null;
+        BufferedReader rd  = null;
+        StringBuilder sb = null;
+        String https_url = "https://github.scm.corp.ebay.com/MobilePlatform/AccessControlService/raw/master/docs/add_user_role.puml";
+        URL url;
+        try {
+
+            url = new URL(https_url);
+            HttpsURLConnection con = (HttpsURLConnection)url.openConnection();
+            con.setRequestProperty("Authorization", "Basic "+Base64.encode("erchan:TinyCouch!6"));
+            con.setRequestMethod("GET");
+            con.setDoOutput(true);
+            con.setReadTimeout(10000);
+
+            con.connect();
+            rd  = new BufferedReader(new InputStreamReader(con.getInputStream()));
+            sb = new StringBuilder();
+
+            while ((line = rd.readLine()) != null)
+            {
+                sb.append(line + '\n');
+            }
+
+            System.out.println(sb.toString());
+
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally{
+            rd = null;
+            wr = null;
+        }
     }
 }
